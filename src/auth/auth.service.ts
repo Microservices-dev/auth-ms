@@ -3,16 +3,23 @@ import { RpcException } from '@nestjs/microservices';
 import * as bycrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
 import { LoginUserDto, RegisterUserDto } from './dto';
+import { JwtService } from '@nestjs/jwt';
+import { JwtPayload } from './interfaces/jwt-payload.interface';
 
 @Injectable()
 export class AuthService extends PrismaClient implements OnModuleInit {
   private readonly logger = new Logger('AuthService');
 
+  constructor(private jwtService: JwtService) {
+    super();
+  }
   onModuleInit() {
     this.$connect();
     this.logger.log('MongoDB connected');
   }
-
+  async jwtSign(paload: JwtPayload) {
+    return this.jwtService.sign(paload);
+  }
   async registerUser(registerUserDto: RegisterUserDto) {
     const { name, email, password } = registerUserDto;
     try {
@@ -34,13 +41,14 @@ export class AuthService extends PrismaClient implements OnModuleInit {
           password: bycrypt.hashSync(password, 10),
         },
       });
+      const userData = {
+        id: newUser.id,
+        email: newUser.email,
+        name: newUser.name,
+      };
       return {
-        user: {
-          id: newUser.id,
-          email: newUser.email,
-          name: newUser.name,
-        },
-        token: 'xx1',
+        user: userData,
+        token: await this.jwtSign(userData),
       };
     } catch (error) {
       throw new RpcException({
@@ -70,13 +78,14 @@ export class AuthService extends PrismaClient implements OnModuleInit {
           message: 'Valid your user or password',
         });
       }
+      const userData = {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      };
       return {
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        },
-        token: 'xx1',
+        user: userData,
+        token: await this.jwtSign(userData),
       };
     } catch (error) {
       throw new RpcException({
